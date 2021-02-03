@@ -11,7 +11,7 @@
 #include <curl/curl.h>
 #include <unistd.h>
 #include "./inc/cmdparser.hpp"
-#include "HUELightSimulator.h"
+#include "./inc/HUELightSimulator.h"
 
 using namespace std;
 using json = nlohmann::json;

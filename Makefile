@@ -15,7 +15,7 @@ OUT = test
 # HUELightSimulation: HUELightSimulator.o
 # 	g++ HUELightSimulator.o -o HUELightSimulation
 
-HUELightSimulator: HUELightSimulator.cpp HUELightSimulator.h
+HUELightSimulator: HUELightSimulator.cpp
 	g++ -o  HUELightSimulation -std=c++11 $(INCLUDE) $(LDFLAGS) $(LDLIBS) HUELightSimulator.cpp 
 
 clean: 
