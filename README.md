@@ -107,8 +107,10 @@ I used the recommended cmdparser to parse the arguments. I did this part last an
 
 ### Additional tests after PR:
 8. Send back non-JSON response strings from server
-> Verify program correctly handles strings that cause JSON parsing errors
+> Verify program correctly handles strings that cause JSON parsing errors.
 
+9. Test for memory leaks
+> Run through an application that tests for memory leaks.
 
 ## Reflection:
 The most difficult part of this project was learning to use HTTP and JSON with C++. I have done it in other languages (JS, C, etc.), but never with C++. Making the HTTP requests and the JSON objects function properly (including understand the API and research) occupied the majority of my development time. Overall, this challenge was a fun use of real-world IOT APIs and allowed me to see a bit into Josh.ai's domain and future work.

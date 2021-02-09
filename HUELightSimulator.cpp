@@ -27,9 +27,9 @@ using ordered_json = nlohmann::ordered_json;
  * @param curl 		Handle to the easy Curl object we set up previously (trying to reconnect with)
  * @return Bool 	Success or failure of connecting to the server after retrying
  */
-bool SuccessfulRetryPhase(int retryAttempts, int sleepTime, CURL *curl) {
-	int attempt = 1;
+bool AttemptHTTPRequestRetry(int retryAttempts, int sleepTime, CURL *curl) {
   	CURLcode res;
+	int attempt = 1;
 
   	// Try retryAttempts to reach the server
 	while (attempt < retryAttempts) {
@@ -54,8 +54,6 @@ bool SuccessfulRetryPhase(int retryAttempts, int sleepTime, CURL *curl) {
 
 /**
  * Creates the CURL handle with the setup parameters
- *
- * ____
  *
  *
  * @param urlString 	String to use for URL connection.
@@ -95,7 +93,7 @@ CURL* CreateHTTPCurlHandle(char* url, int timeout, string* responseString) {
  * @param currentLightsState 	Vector of HueLight objects that were found on the server last request
  * @param newLights 			Vector of HueLight objects that were found on the server in the most recent request
  */
-void compareAndUpdateLightStates(vector<HueLight> &currentLightsState, vector<HueLight> newLights) {
+void CompareAndUpdateLightStates(vector<HueLight> &currentLightsState, vector<HueLight> newLights) {
 	// First set the isValid on all of the currentLights to false. Then we will iterate over and mark each one
 	//	as valid. This will show if any lights have gone offline since the last request.
 	setIsValid(currentLightsState, false);
@@ -119,6 +117,7 @@ void compareAndUpdateLightStates(vector<HueLight> &currentLightsState, vector<Hu
 					json j = ordered_json{ {"id", light.id}, {"on", light.on}};
 
 					cout<<j.dump(4)<<endl;
+
 					// Update the curentLightState
 					currentLightsState.at(index).on = light.on;
 				}
@@ -126,6 +125,7 @@ void compareAndUpdateLightStates(vector<HueLight> &currentLightsState, vector<Hu
 					ordered_json j = ordered_json{ {"id", light.id}, {"brightness", light.brightness}};
 
 					cout<<j.dump(4)<<endl;
+
 					// Update the curentLightState
 					currentLightsState.at(index).brightness = light.brightness;
 				}
@@ -133,6 +133,7 @@ void compareAndUpdateLightStates(vector<HueLight> &currentLightsState, vector<Hu
 					ordered_json j = ordered_json{ {"id", light.id}, {"name", light.name}};
 
 					cout<<j.dump(4)<<endl;
+
 					// Update the curentLightState
 					currentLightsState.at(index).name = light.name;
 				}
@@ -163,13 +164,13 @@ void compareAndUpdateLightStates(vector<HueLight> &currentLightsState, vector<Hu
 }
 
 /**
- * Make the HTTP request via the CURL handle
+ * Make the HTTP request via the CURL handle. The response string is saved into the preset string 
+ * from the curl handle.
  *
- *
- * @param urlString 	String to use for URL connection.
- * @param retryAttempts Attemps to retry making a connection with the server before giving up. 
+ * @param curl 			Pointer to CURL handle to be used in HTTP requests.
  * @param sleep   		Time in microseconds bewteen each GET request.
- * @return CURL* 		Pointer to CURL handle to be used in future HTTP requests.
+ * @param retryAttempts Attemps to retry making a connection with the server before giving up. 
+ * @return Bool 		Success or failure of request 		
  */
 bool MakeHTTPRequest(CURL* curl, int sleep, int retryAttempts) {
   	CURLcode res;
@@ -181,7 +182,7 @@ bool MakeHTTPRequest(CURL* curl, int sleep, int retryAttempts) {
   		fprintf(stderr, "Function MakeHTTPRequest: curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 
   		// If we cannot reach the server after retryAttempts, exit the program with error code
-  		if (!SuccessfulRetryPhase(retryAttempts, sleep, curl)) {
+  		if (!AttemptHTTPRequestRetry(retryAttempts, sleep, curl)) {
   			char *url = NULL;
   			
   			curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &url);
@@ -227,36 +228,42 @@ vector<HueLight> GetLightObjects(string url, int timeout, int elements) {
 
 		if (!curl) {
 			// Unable to create CURL object
+			// cout<<"For debugging: Something went wrong creating curl object"<<endl;
 			curl_easy_cleanup(curl);
 			continue;
 		}
 
 		if (!MakeHTTPRequest(curl, lightSleep, lightRetryAttempts)) {
 			// Something went wrong in the request, do not process responseString for JSON
+			// cout<<"For debugging: Something went wrong in the HTTP request"<<endl;
+			curl_easy_cleanup(curl);			
 			continue;
 		}
 
+  		//cout<<"For debugging: \nResponse string: [[["<<responseString<<"]]]\n";
+
 	    if (responseString == "") {
 	    	//printf("There was no information for element with id = %d. It was not due to a failure on the server side. Assume light has gone offline. \n", i);
+	    	curl_easy_cleanup(curl);
 	    	continue;
     	}
-
-  		//cout<<"For debugging: \nResponse string: [[["<<responseString<<"]]]\n";
 
   		// Validate the incoming JSON responseString --> make sure always have all fields correct
 		// json library throws an error when there is illegal access:
 		//	"accessing an invalid index (i.e., an index greater than or equal to the array size) or the passed object key is non-existing, an exception is thrown." (https://nlohmann.github.io/json/features/element_access/checked_access/)
 		try {
+			HueLight light;
 			json j = json::parse(responseString);
 			//cout<<"For debugging: j: "<<j.dump(4)<<endl;
-			HueLight light;
+
+			light.id = i;
 			light.name = j.at("name");
-	  		light.id = i;
 	  		light.on = j.at("state").at("on");
-			int bri = j.at("state").at("bri");
-			light.bri = bri;
+			light.bri = j.at("state").at("bri");
+
 	  		// https://developers.meethue.com/develop/hue-api/lights-api/
 	  		// Note: Brightness of the light. This is a scale from the minimum brightness the light is capable of, 1, to the maximum capable brightness, 254.
+			int bri = light.bri;
 			if (bri > 254) bri = 254;
 			if (bri < 1) bri = 1;
 			light.brightness = (int) (100 * bri / 254);
@@ -285,11 +292,22 @@ void configure_parser(cli::Parser& parser) {
 }
 
 
-void ProcessJSONLightsResonse(vector<HueLight> &currentLightsState, int elements, string url, int timeout, bool initialRun) {
-	if (initialRun) {
-		// Do the following for the first request being made
-		vector<HueLight> lights = GetLightObjects(url, timeout, elements);
+//. Prints out changes.
+/**
+ * Updates the currentLightsState vector to have active lights from latest request. 
+ * This function also prints out the state changes and initial state of the application (lights).
+ *
+ * @param url 		String url to connect to
+ * @param timeout 	Time in seconds before a timeout on the GET request.
+ * @param elements 	Number of elements found in the "Query all" GET request
+ * @return vector<HueLight> Vector of individual HueLight objects that were found on the server
+ */
+void ProcessJSONLightsResonse(vector<HueLight> &currentLightsState, int elements, string url, int timeout, int runCount) {
+	// For each light we find, we need to get its attributes 
+	vector<HueLight> lights = GetLightObjects(url, timeout, elements);
 
+	// Do the following for the first request being made
+	if (runCount == 0) {
 		// Perform deep copy of vector
 	    copy(lights.begin(), lights.end(), back_inserter(currentLightsState)); 
 	    
@@ -301,13 +319,10 @@ void ProcessJSONLightsResonse(vector<HueLight> &currentLightsState, int elements
 		return;
 	}
 
-	// For each light we find, we need to get its attributes 
-	vector<HueLight> lights = GetLightObjects(url, timeout, elements);
-
 	// Need to compare the newly retrieved lights to the currentLightsState and print the differences.
-	compareAndUpdateLightStates(currentLightsState, lights);
+	CompareAndUpdateLightStates(currentLightsState, lights);
 
-	//For debugging: cout<<"Current light vector\n"<<to_json_vector(currentLightsState).dump(4)<<endl;
+	// cout<<"For debugging: "<<runCount<<": Current light vector\n"<<to_json_vector(currentLightsState).dump(4)<<endl;
 }
 
 /**
@@ -327,14 +342,15 @@ void ProcessJSONLightsResonse(vector<HueLight> &currentLightsState, int elements
  */
 int RunProgram(string hostname, int portNumber, int timeout, int sleep, int retryAttempts) {
   	CURLcode res;
-    bool allGood = true;
-    int requestsMade = 0;
 	vector<HueLight> currentLightsState;
-    string responseString;
 	json j;
-	bool initialRun = true;
+    int requestsMade = 0;
+	int runCount = 0;
 	int elements = 0;
-	string urlString = "http://"+hostname+":"+to_string(portNumber)+"/api/newdeveloper/lights/";
+    string responseString;
+    string urlString;
+
+	urlString = "http://"+hostname+":"+to_string(portNumber)+"/api/newdeveloper/lights/";
 	char* url = createURLFromString(urlString);
 	CURL *curl = CreateHTTPCurlHandle(url, timeout, &responseString);
 
@@ -346,7 +362,7 @@ int RunProgram(string hostname, int portNumber, int timeout, int sleep, int retr
 
 	printf("Connecting to %s\n\n", urlString.c_str());
 
-	while (allGood) {
+	while (curl) {
 		// Clear the resonse string
 		responseString.clear();
 
@@ -379,14 +395,17 @@ int RunProgram(string hostname, int portNumber, int timeout, int sleep, int retr
 			elements+=1;
 		}
 
-		ProcessJSONLightsResonse(currentLightsState, elements, urlString, timeout, initialRun);	
+		// Updates the currentLightsState vector to have active lights from latest request. Prints out changes.
+		ProcessJSONLightsResonse(currentLightsState, elements, urlString, timeout, runCount);	
 
-		initialRun = false;
+		runCount++;
 		
 		usleep(sleep);
 	}
 
     curl_easy_cleanup(curl);
+    
+    return 0;
 }
 
 /*
