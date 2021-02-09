@@ -105,6 +105,9 @@ I used the recommended cmdparser to parse the arguments. I did this part last an
 7. Change "name", "brightness", and "on" in various combinations and expect correct results
 >Verify correct results and reporting of state changes from different combinations of changes.
 
+### Additional tests after PR:
+8. Send back non-JSON response strings from server
+> Verify program correctly handles strings that cause JSON parsing errors
 
 
 ## Reflection:
