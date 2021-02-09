@@ -99,6 +99,11 @@ size_t writeFunction(void *ptr, size_t size, size_t nmemb, std::string* data) {
     return size * nmemb;
 }
 
+
+/**
+ *
+ * Helper function to create a char* url from a string.
+*/
 char* createURLFromString(std::string urlString) {
 	char* url = new char[urlString.length() + 1];
 	strcpy(url, urlString.c_str());
