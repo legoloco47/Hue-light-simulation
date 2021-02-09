@@ -123,8 +123,9 @@ The most difficult part of this project was learning to use HTTP and JSON with C
 | 2		| Understanding & implementing C++ JSON objects   	|
 | 3.5  | Satisfying requirements, debugging, testing, etc. 	|
 | 2		| Code clean-up, documenting, writing Readme, etc.|
+| 1.5	| Address PR comments. Make code more robust	|
 
 
- ### Total: 10.5 Hours
+ ### Total: 12 Hours
 
 
