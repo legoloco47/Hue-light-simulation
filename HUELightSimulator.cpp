@@ -165,8 +165,6 @@ void compareAndUpdateLightStates(vector<HueLight> &currentLightsState, vector<Hu
 /**
  * Make the HTTP request via the CURL handle
  *
- * ____
- *
  *
  * @param urlString 	String to use for URL connection.
  * @param retryAttempts Attemps to retry making a connection with the server before giving up. 
@@ -287,7 +285,22 @@ void configure_parser(cli::Parser& parser) {
 }
 
 
-void ProcessJSONLightsResonse(vector<HueLight> currentLightsState, int elements, string url, int timeout) {
+void ProcessJSONLightsResonse(vector<HueLight> &currentLightsState, int elements, string url, int timeout, bool initialRun) {
+	if (initialRun) {
+		// Do the following for the first request being made
+		vector<HueLight> lights = GetLightObjects(url, timeout, elements);
+
+		// Perform deep copy of vector
+	    copy(lights.begin(), lights.end(), back_inserter(currentLightsState)); 
+	    
+		//Print the json objects as dump
+		ordered_json output = to_json_vector(lights);
+
+		cout<<output.dump(4)<<endl;
+
+		return;
+	}
+
 	// For each light we find, we need to get its attributes 
 	vector<HueLight> lights = GetLightObjects(url, timeout, elements);
 
@@ -296,7 +309,6 @@ void ProcessJSONLightsResonse(vector<HueLight> currentLightsState, int elements,
 
 	//For debugging: cout<<"Current light vector\n"<<to_json_vector(currentLightsState).dump(4)<<endl;
 }
-
 
 /**
  * Run the simulation.
@@ -320,6 +332,7 @@ int RunProgram(string hostname, int portNumber, int timeout, int sleep, int retr
 	vector<HueLight> currentLightsState;
     string responseString;
 	json j;
+	bool initialRun = true;
 	int elements = 0;
 	string urlString = "http://"+hostname+":"+to_string(portNumber)+"/api/newdeveloper/lights/";
 	char* url = createURLFromString(urlString);
@@ -366,27 +379,10 @@ int RunProgram(string hostname, int portNumber, int timeout, int sleep, int retr
 			elements+=1;
 		}
 
-		if (requestsMade == 0) {
-			// Do the following for the first request being made
-			vector<HueLight> lights = GetLightObjects(urlString, timeout, elements);
+		ProcessJSONLightsResonse(currentLightsState, elements, urlString, timeout, initialRun);	
 
-			// Perform deep copy of vector
-		    copy(lights.begin(), lights.end(), back_inserter(currentLightsState)); 
-		    
-			//Print the json objects as dump
-			ordered_json output = to_json_vector(lights);
-
-			cout<<output.dump(4)<<endl;
-
-			requestsMade++;
-
-			continue;
-		}
+		initialRun = false;
 		
-		ProcessJSONLightsResonse(currentLightsState, elements, urlString, timeout);	
-		
-		requestsMade++;
-
 		usleep(sleep);
 	}
 
